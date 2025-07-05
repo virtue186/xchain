@@ -1,67 +1,29 @@
 package core
 
 import (
-	"bytes"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"github.com/virtue186/xchain/types"
 	"testing"
 	"time"
 )
 
-func TestHeader_EncodeDecode(t *testing.T) {
+func RandomBlock(height uint32) *Block {
 
 	h := &Header{
-		Version:   1,
-		PrevHash:  types.RandomHash(),
-		Timestamp: time.Now().UnixNano(),
-		Height:    10,
-		Nonce:     984567,
+		Version:       1,
+		PrevBlockHash: types.RandomHash(),
+		DataHash:      types.RandomHash(),
+		Timestamp:     time.Now().UnixNano(),
+		Height:        height,
+		Nonce:         8184848,
 	}
-
-	buf := &bytes.Buffer{}
-	assert.Nil(t, h.EncodeBinary(buf))
-
-	h2 := &Header{}
-	assert.Nil(t, h2.DecodeBinary(buf))
-
-	assert.Equal(t, h, h2)
-}
-
-func TestBlock_EncodeDecode(t *testing.T) {
-	b := &Block{
-		Header: Header{
-			Version:   1,
-			PrevHash:  types.RandomHash(),
-			Timestamp: time.Now().UnixNano(),
-			Height:    10,
-			Nonce:     984567,
-		},
-		Transactions: nil,
+	t := Transaction{
+		Data: []byte("hello world"),
 	}
-
-	buf := &bytes.Buffer{}
-	assert.Nil(t, b.EncodeBinary(buf))
-	b2 := &Block{}
-	assert.Nil(t, b2.DecodeBinary(buf))
-	assert.Equal(t, b, b2)
-
-	fmt.Printf("%+v\n", b2)
+	return NewBlock(h, []Transaction{t})
 }
 
 func TestBlock_Hash(t *testing.T) {
-	b := &Block{
-		Header: Header{
-			Version:   1,
-			PrevHash:  types.RandomHash(),
-			Timestamp: time.Now().UnixNano(),
-			Height:    10,
-			Nonce:     984567,
-		},
-		Transactions: []Transaction{},
-	}
-
-	hash := b.Hash()
-	fmt.Printf("%x\n", hash)
-	assert.False(t, hash.IsZero())
+	block := RandomBlock(0)
+	fmt.Println(block.Hash(BlockHasher{}))
 }

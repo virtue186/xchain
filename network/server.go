@@ -2,30 +2,65 @@ package network
 
 import (
 	"fmt"
+	"github.com/sirupsen/logrus"
+	"github.com/virtue186/xchain/core"
+	"github.com/virtue186/xchain/crypto"
 	"time"
 )
 
+var defaultBlockTime = time.Second * 5
+
 type ServerOpts struct {
 	Transports []Transport
+	PrivateKey *crypto.PrivateKey
+	BlockTime  time.Duration
 }
 
 type Server struct {
 	ServerOpts
-	rpcCh  chan RPC
-	quitCh chan struct{}
+	blocktime   time.Duration
+	memPool     *TxPool
+	IsValidator bool
+	rpcCh       chan RPC
+	quitCh      chan struct{}
 }
 
 func NewServer(opts ServerOpts) *Server {
-	return &Server{
-		ServerOpts: opts,
-		rpcCh:      make(chan RPC),
-		quitCh:     make(chan struct{}, 1),
+	if opts.BlockTime == time.Duration(0) {
+		opts.BlockTime = defaultBlockTime
 	}
+	return &Server{
+		ServerOpts:  opts,
+		blocktime:   opts.BlockTime,
+		memPool:     NewTxPool(),
+		IsValidator: opts.PrivateKey != nil,
+		rpcCh:       make(chan RPC),
+		quitCh:      make(chan struct{}, 1),
+	}
+}
+
+func (s *Server) handleTransaction(tx *core.Transaction) error {
+	if err := tx.Verify(); err != nil {
+		return err
+	}
+	hash := tx.Hash(core.TxHasher{})
+	if s.memPool.Has(hash) {
+		logrus.WithFields(logrus.Fields{
+			"hash": hash,
+		}).Info("transaction already exists")
+		return nil
+	}
+	logrus.WithFields(logrus.Fields{
+		"hash": tx.Hash(core.TxHasher{}),
+	}).Info("add new transaction to pool")
+
+	return s.memPool.Add(tx)
+
 }
 
 func (s *Server) Start() {
 	s.InitTransports()
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(s.blocktime)
 free:
 	for {
 		select {
@@ -34,7 +69,9 @@ free:
 		case <-s.quitCh:
 			break free
 		case <-ticker.C:
-			fmt.Println("do stuff every 5 seconds")
+			if s.IsValidator {
+				s.CreateBlock()
+			}
 		}
 	}
 	fmt.Println("server stopped")
@@ -52,4 +89,9 @@ func (s *Server) InitTransports() {
 
 	}
 
+}
+
+func (s *Server) CreateBlock() error {
+	fmt.Println("create a new block")
+	return nil
 }

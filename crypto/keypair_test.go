@@ -17,6 +17,6 @@ func TestGeneratePrivateKey(t *testing.T) {
 	sign, err := privateKey.Sign(msg)
 	assert.Nil(t, err)
 
-	assert.True(t, sign.verify(publicKey, msg))
-	assert.False(t, sign.verify(publicKey, errmsg))
+	assert.True(t, sign.Verify(publicKey, msg))
+	assert.False(t, sign.Verify(publicKey, errmsg))
 }

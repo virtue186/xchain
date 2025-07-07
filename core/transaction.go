@@ -3,21 +3,37 @@ package core
 import (
 	"fmt"
 	"github.com/virtue186/xchain/crypto"
-	"io"
+	"github.com/virtue186/xchain/types"
 )
 
 type Transaction struct {
 	Data      []byte
-	PublicKey crypto.PublicKey
+	From      crypto.PublicKey
 	Signature *crypto.Signature
+
+	hash      types.Hash
+	firstSeen int64
 }
 
-func (tx *Transaction) EncodeBinary(r io.Writer) error {
-	return nil
+func NewTransaction(data []byte) *Transaction {
+	return &Transaction{
+		Data: data,
+	}
 }
 
-func (tx *Transaction) DecodeBinary(r io.Reader) error {
-	return nil
+func (tx *Transaction) Hash(hasher Hasher[*Transaction]) types.Hash {
+	if tx.hash.IsZero() {
+		tx.hash = hasher.Hash(tx)
+	}
+	return tx.hash
+}
+
+func (tx *Transaction) Encode(enc Encoder[*Transaction]) error {
+	return enc.Encode(tx)
+}
+
+func (tx *Transaction) Decode(dec Decoder[*Transaction]) error {
+	return dec.Decode(tx)
 }
 
 func (tx *Transaction) Sign(privateKey crypto.PrivateKey) error {
@@ -25,7 +41,7 @@ func (tx *Transaction) Sign(privateKey crypto.PrivateKey) error {
 	if err != nil {
 		return err
 	}
-	tx.PublicKey = privateKey.PublicKey()
+	tx.From = privateKey.PublicKey()
 	tx.Signature = sign
 	return nil
 }
@@ -35,8 +51,16 @@ func (tx *Transaction) Verify() error {
 		return fmt.Errorf("transaction signature is nil")
 	}
 
-	if !tx.Signature.Verify(tx.PublicKey, tx.Data) {
+	if !tx.Signature.Verify(tx.From, tx.Data) {
 		return fmt.Errorf("transaction signature is invalid")
 	}
 	return nil
+}
+
+func (tx *Transaction) SetFirstSeen(firstSeen int64) {
+	tx.firstSeen = firstSeen
+}
+
+func (tx *Transaction) GetFirstSeen() int64 {
+	return tx.firstSeen
 }

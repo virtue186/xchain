@@ -6,30 +6,51 @@ import (
 	"testing"
 )
 
-func NewBlockWithoutValidator(t *testing.T) *BlockChain {
-	bc, err := NewBlockChain(RandomBlock(0, types.Hash{}))
-	assert.Nil(t, err)
-	return bc
+func TestAddBlock(t *testing.T) {
+	bc := newBlockchainWithGenesis(t)
+
+	lenBlocks := 1000
+	for i := 0; i < lenBlocks; i++ {
+		block := randomBlock(t, uint32(i+1), getPrevBlockHash(t, bc, uint32(i+1)))
+		assert.Nil(t, bc.AddBlock(block))
+	}
+
+	assert.Equal(t, bc.Height(), uint32(lenBlocks))
+	assert.Equal(t, len(bc.headers), lenBlocks+1)
+	assert.NotNil(t, bc.AddBlock(randomBlock(t, 89, types.Hash{})))
 }
 
-func TestBlockChain(t *testing.T) {
-	bc, err := NewBlockChain(RandomBlock(0, types.Hash{}))
-	assert.Nil(t, err)
+func TestNewBlockchain(t *testing.T) {
+	bc := newBlockchainWithGenesis(t)
 	assert.NotNil(t, bc.validator)
 	assert.Equal(t, bc.Height(), uint32(0))
-	println(bc.Height())
 }
 
-func TestAddBlock(t *testing.T) {
-	bc := NewBlockWithoutValidator(t)
-	for i := 0; i < 1000; i++ {
-		block := RandomBlockWithSignature(t, uint32(i+1), getPrevBlockHash(t, bc, uint32(i+1)))
-		err := bc.AddBlock(block)
+func TestGetHeader(t *testing.T) {
+	bc := newBlockchainWithGenesis(t)
+	lenBlocks := 1000
+
+	for i := 0; i < lenBlocks; i++ {
+		block := randomBlock(t, uint32(i+1), getPrevBlockHash(t, bc, uint32(i+1)))
+		assert.Nil(t, bc.AddBlock(block))
+		header, err := bc.GetHeader(block.Height)
 		assert.Nil(t, err)
+		assert.Equal(t, header, block.Header)
 	}
-	assert.Equal(t, bc.Height(), uint32(1000))
-	assert.Equal(t, len(bc.headers), 1001)
-	assert.Nil(t, bc.AddBlock(RandomBlock(18, types.Hash{})))
+}
+
+func TestAddBlockToHigh(t *testing.T) {
+	bc := newBlockchainWithGenesis(t)
+
+	assert.Nil(t, bc.AddBlock(randomBlock(t, 1, getPrevBlockHash(t, bc, uint32(1)))))
+	assert.NotNil(t, bc.AddBlock(randomBlock(t, 3, types.Hash{})))
+}
+
+func newBlockchainWithGenesis(t *testing.T) *BlockChain {
+	bc, err := NewBlockChain(randomBlock(t, 0, types.Hash{}))
+	assert.Nil(t, err)
+
+	return bc
 }
 
 func getPrevBlockHash(t *testing.T, bc *BlockChain, height uint32) types.Hash {

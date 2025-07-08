@@ -2,10 +2,12 @@ package core
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/gob"
 	"fmt"
 	"github.com/virtue186/xchain/crypto"
 	"github.com/virtue186/xchain/types"
+	"time"
 )
 
 type Header struct {
@@ -18,7 +20,7 @@ type Header struct {
 }
 type Block struct {
 	*Header
-	Transactions []Transaction
+	Transactions []*Transaction
 	Validator    crypto.PublicKey
 	Signature    *crypto.Signature
 
@@ -52,7 +54,7 @@ func (b *Block) Decode(enc Decoder[*Block]) error {
 	return enc.Decode(b)
 }
 
-func NewBlock(header *Header, transactions []Transaction) *Block {
+func NewBlock(header *Header, transactions []*Transaction) *Block {
 	return &Block{
 		Header:       header,
 		Transactions: transactions,
@@ -74,7 +76,7 @@ func (b *Block) Verify() error {
 		return fmt.Errorf("signature is nil")
 	}
 	if !b.Signature.Verify(b.Validator, b.Header.Bytes()) {
-		return fmt.Errorf("signature is invalid")
+		return fmt.Errorf("block {%s} signature is invalid", b.Hash(BlockHasher{}))
 	}
 
 	for _, tx := range b.Transactions {
@@ -82,5 +84,43 @@ func (b *Block) Verify() error {
 			return err
 		}
 	}
+
+	datahash, err := CalculateDataHash(b.Transactions)
+	if err != nil {
+		return err
+	}
+	if datahash != b.hash {
+		return fmt.Errorf("data hash is invalid")
+	}
+
 	return nil
+}
+
+func NewBlockFromPreHeader(h *Header, txx []*Transaction) (*Block, error) {
+	datahash, err := CalculateDataHash(txx)
+	if err != nil {
+		return nil, err
+	}
+	header := &Header{
+		Version:       h.Version,
+		DataHash:      datahash,
+		PrevBlockHash: BlockHasher{}.Hash(h),
+		Timestamp:     time.Now().UnixNano(),
+		Height:        h.Height + 1,
+	}
+	return NewBlock(header, txx), nil
+}
+
+func CalculateDataHash(txx []*Transaction) (hash types.Hash, err error) {
+	buf := &bytes.Buffer{}
+
+	for _, tx := range txx {
+		if err = tx.Encode(NewGobTxEncoder(buf)); err != nil {
+			return
+		}
+	}
+
+	hash = sha256.Sum256(buf.Bytes())
+
+	return
 }

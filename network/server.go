@@ -2,16 +2,20 @@ package network
 
 import (
 	"bytes"
-	"fmt"
+	"github.com/go-kit/log"
 	"github.com/sirupsen/logrus"
 	"github.com/virtue186/xchain/core"
 	"github.com/virtue186/xchain/crypto"
+	"github.com/virtue186/xchain/types"
+	"os"
 	"time"
 )
 
 var defaultBlockTime = time.Second * 5
 
 type ServerOpts struct {
+	ID            string
+	Logger        log.Logger
 	RPCDecodeFunc RPCDecodeFunc
 	RPCProcessor  RPCProcessor
 	Transports    []Transport
@@ -24,18 +28,29 @@ type Server struct {
 	blocktime   time.Duration
 	memPool     *TxPool
 	IsValidator bool
+	BlockChain  *core.BlockChain
 	rpcCh       chan RPC
 	quitCh      chan struct{}
 }
 
-func NewServer(opts ServerOpts) *Server {
+func NewServer(opts ServerOpts) (*Server, error) {
 	if opts.BlockTime == time.Duration(0) {
 		opts.BlockTime = defaultBlockTime
 	}
 	if opts.RPCDecodeFunc == nil {
 		opts.RPCDecodeFunc = DefaultRPCDecodeFunc
 	}
+	if opts.Logger == nil {
+		opts.Logger = log.NewLogfmtLogger(os.Stderr)
+		opts.Logger = log.With(opts.Logger, "ID", opts.ID)
+	}
+	chain, err := core.NewBlockChain(genesisBlock())
+	if err != nil {
+		return nil, err
+	}
+
 	s := &Server{
+		BlockChain:  chain,
 		ServerOpts:  opts,
 		blocktime:   opts.BlockTime,
 		memPool:     NewTxPool(),
@@ -43,11 +58,15 @@ func NewServer(opts ServerOpts) *Server {
 		rpcCh:       make(chan RPC),
 		quitCh:      make(chan struct{}, 1),
 	}
+
 	if s.RPCProcessor == nil {
 		s.RPCProcessor = s
 	}
+	if s.IsValidator {
+		go s.validatorLoop()
+	}
 
-	return s
+	return s, nil
 }
 
 func (s *Server) ProcessMessage(message *DecodedMessage) error {
@@ -74,10 +93,10 @@ func (s *Server) ProcessTransaction(tx *core.Transaction) error {
 	}
 	tx.SetFirstSeen(time.Now().UnixNano())
 
-	logrus.WithFields(logrus.Fields{
-		"hash":           tx.Hash(core.TxHasher{}),
-		"mempool length": s.memPool.Len(),
-	}).Info("add new transaction to pool")
+	s.Logger.Log("msg", "add new transaction to pool",
+		"hash", hash,
+		"mempool length", s.memPool.Len(),
+	)
 
 	go s.broadcastTx(tx)
 
@@ -87,29 +106,35 @@ func (s *Server) ProcessTransaction(tx *core.Transaction) error {
 
 func (s *Server) Start() {
 	s.InitTransports()
-	ticker := time.NewTicker(s.blocktime)
 free:
 	for {
 		select {
 		case rpc := <-s.rpcCh:
 			msg, err := s.RPCDecodeFunc(rpc)
 			if err != nil {
-				logrus.Errorf("handle rpc error: %v", err)
+				s.Logger.Log("err", err)
 			}
-			err2 := s.RPCProcessor.ProcessMessage(msg)
+			err = s.RPCProcessor.ProcessMessage(msg)
 			if err != nil {
-				logrus.Errorf("handle rpc error: %v", err2)
+				s.Logger.Log("err", err)
 			}
 
 		case <-s.quitCh:
 			break free
-		case <-ticker.C:
-			if s.IsValidator {
-				s.CreateBlock()
-			}
 		}
 	}
-	fmt.Println("server stopped")
+	s.Logger.Log("server is shutting down")
+}
+
+func (s *Server) validatorLoop() {
+
+	ticker := time.NewTicker(s.blocktime)
+	s.Logger.Log("msg", "validator loop started", "blocktime", s.blocktime)
+	for {
+		<-ticker.C
+		s.CreateNewBlock()
+	}
+
 }
 
 func (s *Server) InitTransports() {
@@ -126,9 +151,38 @@ func (s *Server) InitTransports() {
 
 }
 
-func (s *Server) CreateBlock() error {
-	fmt.Println("create a new block")
+func (s *Server) CreateNewBlock() error {
+	currentHeader, err := s.BlockChain.GetHeader(s.BlockChain.Height())
+	if err != nil {
+		return err
+	}
+	block, err := core.NewBlockFromPreHeader(currentHeader, nil)
+	if err != nil {
+		return err
+	}
+	err = block.Sign(*s.PrivateKey)
+	if err != nil {
+		return err
+	}
+
+	err = s.BlockChain.AddBlock(block)
+	if err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func genesisBlock() *core.Block {
+	header := &core.Header{
+		Version:       1,
+		PrevBlockHash: types.Hash{},
+		Height:        0,
+		Timestamp:     time.Now().UnixNano(),
+		DataHash:      types.Hash{},
+	}
+	return core.NewBlock(header, nil)
+
 }
 
 func (s *Server) broadcast(payload []byte) error {

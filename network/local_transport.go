@@ -43,7 +43,7 @@ func (t *LocalTransport) SendMessage(to NetAddr, payload []byte) error {
 
 	trans, ok := t.peers[to]
 	if !ok {
-		return fmt.Errorf("no transport for %s", to)
+		return fmt.Errorf("no peer send for %s", to)
 	}
 	trans.consumeCh <- RPC{
 		From:    t.addr,

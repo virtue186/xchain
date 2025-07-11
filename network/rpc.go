@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	MessageTypeTx MessageType = 0x1
-	MessageTypeBlock
+	MessageTypeTx    MessageType = 0x1
+	MessageTypeBlock MessageType = 0x2
 )
 
 type MessageType byte
@@ -58,6 +58,16 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 		return &DecodedMessage{
 			rpc.From,
 			tx,
+		}, nil
+	case MessageTypeBlock:
+		block := new(core.Block)
+		err := block.Decode(core.NewGobBlockDecoder(bytes.NewReader(msg.Data)))
+		if err != nil {
+			return nil, err
+		}
+		return &DecodedMessage{
+			rpc.From,
+			block,
 		}, nil
 	default:
 		return nil, fmt.Errorf("unknown RPC type: %v", msg.Header)

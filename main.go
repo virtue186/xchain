@@ -2,10 +2,12 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/sirupsen/logrus"
 	"github.com/virtue186/xchain/core"
 	"github.com/virtue186/xchain/crypto"
 	"github.com/virtue186/xchain/network"
+	"log"
 	"math/rand"
 	"strconv"
 	"time"
@@ -13,33 +15,67 @@ import (
 
 func main() {
 
-	transport := network.NewLocalTransport("LOCAL")
-	transport2 := network.NewLocalTransport("Remote")
+	trLocal := network.NewLocalTransport("LOCAL")
+	trRemoteA := network.NewLocalTransport("Remote_A")
+	trRemoteB := network.NewLocalTransport("Remote_B")
+	trRemoteC := network.NewLocalTransport("Remote_C")
 
-	transport.Connect(transport2)
-	transport2.Connect(transport)
+	trLocal.Connect(trRemoteA)
+	trRemoteA.Connect(trLocal)
+	trRemoteA.Connect(trRemoteB)
+	trRemoteB.Connect(trRemoteC)
 
 	go func() {
 		for {
-			err := sendTransaction(transport2, transport.Addr())
+			err := sendTransaction(trRemoteA, trLocal.Addr())
 			if err != nil {
 				logrus.Error(err)
 			}
-			time.Sleep(1 * time.Second)
+			time.Sleep(2 * time.Second)
 		}
 	}()
-	privateKey := crypto.GeneratePrivateKey()
+	// 开启一个延迟启动的服务
+	go func() {
+		time.Sleep(30 * time.Second)
+		trLater := network.NewLocalTransport("Later")
+		trLocal.Connect(trLater)
+		trLater.Connect(trLocal)
+		privateKey2 := crypto.GeneratePrivateKey()
+		server2 := makeServer("Later", trLater, &privateKey2)
+		server2.Start()
+	}()
 
+	//  初始化远程服务
+
+	initRemoteServer([]network.Transport{trRemoteA, trRemoteB, trRemoteC})
+
+	// 开启本地服务
+	privateKey := crypto.GeneratePrivateKey()
+	server := makeServer("LOCAL", trLocal, &privateKey)
+	server.Start()
+
+}
+
+func initRemoteServer(transports []network.Transport) {
+	for i := 0; i < len(transports); i++ {
+		id := fmt.Sprintf("Remote_%d", i)
+		server := makeServer(id, transports[i], nil)
+		go server.Start()
+	}
+
+}
+
+func makeServer(id string, tr network.Transport, key *crypto.PrivateKey) *network.Server {
 	opts := network.ServerOpts{
-		PrivateKey: &privateKey,
-		ID:         "local",
-		Transports: []network.Transport{transport},
+		PrivateKey: key,
+		Transports: []network.Transport{tr},
+		ID:         id,
 	}
 	server, err := network.NewServer(opts)
 	if err != nil {
-		logrus.Error(err)
+		log.Fatal(err)
 	}
-	server.Start()
+	return server
 }
 
 func sendTransaction(tr network.Transport, addr network.NetAddr) error {

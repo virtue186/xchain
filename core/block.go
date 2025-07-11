@@ -54,11 +54,11 @@ func (b *Block) Decode(enc Decoder[*Block]) error {
 	return enc.Decode(b)
 }
 
-func NewBlock(header *Header, transactions []*Transaction) *Block {
+func NewBlock(header *Header, transactions []*Transaction) (*Block, error) {
 	return &Block{
 		Header:       header,
 		Transactions: transactions,
-	}
+	}, nil
 }
 
 func (b *Block) Sign(privateKey crypto.PrivateKey) error {
@@ -89,10 +89,9 @@ func (b *Block) Verify() error {
 	if err != nil {
 		return err
 	}
-	if datahash != b.hash {
+	if datahash != b.DataHash {
 		return fmt.Errorf("data hash is invalid")
 	}
-
 	return nil
 }
 
@@ -108,7 +107,7 @@ func NewBlockFromPreHeader(h *Header, txx []*Transaction) (*Block, error) {
 		Timestamp:     time.Now().UnixNano(),
 		Height:        h.Height + 1,
 	}
-	return NewBlock(header, txx), nil
+	return NewBlock(header, txx)
 }
 
 func CalculateDataHash(txx []*Transaction) (hash types.Hash, err error) {

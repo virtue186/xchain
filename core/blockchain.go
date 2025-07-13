@@ -7,19 +7,20 @@ import (
 )
 
 type BlockChain struct {
-	logger    log.Logger
-	store     Storage
-	headers   []*Header
-	validator Validator
-
-	lock sync.RWMutex
+	logger        log.Logger
+	store         Storage
+	headers       []*Header
+	validator     Validator
+	lock          sync.RWMutex
+	contractState *State
 }
 
 func NewBlockChain(log log.Logger, genesis *Block) (*BlockChain, error) {
 	bc := &BlockChain{
-		headers: []*Header{},
-		store:   NewMemoryStorage(),
-		logger:  log,
+		contractState: NewState(),
+		headers:       []*Header{},
+		store:         NewMemoryStorage(),
+		logger:        log,
 	}
 	bc.validator = NewBlockValidator(bc)
 	err := bc.AddBlockWithoutValidation(genesis)

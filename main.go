@@ -40,8 +40,7 @@ func main() {
 		trLater := network.NewLocalTransport("Later")
 		trLocal.Connect(trLater)
 		trLater.Connect(trLocal)
-		privateKey2 := crypto.GeneratePrivateKey()
-		server2 := makeServer("Later", trLater, &privateKey2)
+		server2 := makeServer("Later", trLater, nil)
 		server2.Start()
 	}()
 

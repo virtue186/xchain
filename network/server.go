@@ -91,11 +91,11 @@ func (s *Server) ProcessTransaction(tx *core.Transaction) error {
 	}
 	tx.SetFirstSeen(time.Now().UnixNano())
 
-	//s.Logger.Log(
-	//	"msg", "adding new tx to mempool",
-	//	"hash", hash,
-	//	"mempoolPending", s.memPool.PendingCount(),
-	//)
+	s.Logger.Log(
+		"msg", "adding new tx to mempool",
+		"hash", hash,
+		"mempoolPending", s.memPool.PendingCount(),
+	)
 
 	go s.broadcastTx(tx)
 	s.memPool.Add(tx)

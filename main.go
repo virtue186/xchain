@@ -8,8 +8,6 @@ import (
 	"github.com/virtue186/xchain/crypto"
 	"github.com/virtue186/xchain/network"
 	"log"
-	"math/rand"
-	"strconv"
 	"time"
 )
 
@@ -35,14 +33,14 @@ func main() {
 		}
 	}()
 	// 开启一个延迟启动的服务
-	go func() {
-		time.Sleep(30 * time.Second)
-		trLater := network.NewLocalTransport("Later")
-		trLocal.Connect(trLater)
-		trLater.Connect(trLocal)
-		server2 := makeServer("Later", trLater, nil)
-		server2.Start()
-	}()
+	//go func() {
+	//	time.Sleep(30 * time.Second)
+	//	trLater := network.NewLocalTransport("Later")
+	//	trLocal.Connect(trLater)
+	//	trLater.Connect(trLocal)
+	//	server2 := makeServer("Later", trLater, nil)
+	//	server2.Start()
+	//}()
 
 	//  初始化远程服务
 
@@ -79,8 +77,18 @@ func makeServer(id string, tr network.Transport, key *crypto.PrivateKey) *networ
 
 func sendTransaction(tr network.Transport, addr network.NetAddr) error {
 	privateKey := crypto.GeneratePrivateKey()
-	data := []byte(strconv.FormatInt(int64(rand.Intn(1000)), 10))
-	tx := core.NewTransaction(data)
+	code := []byte{
+		byte(core.InstrPushByte), 'f', // push 63
+		byte(core.InstrPushByte), 'o', // push 62
+		byte(core.InstrPushByte), 'o',
+		byte(core.InstrPushInt), 3,
+		byte(core.InstrPack),
+		byte(core.InstrPushInt), 2,
+		byte(core.InstrPushInt), 3,
+		byte(core.InstrAdd),
+		byte(core.InstrStore),
+	}
+	tx := core.NewTransaction(code)
 	tx.Sign(privateKey)
 	buf := &bytes.Buffer{}
 	if err := tx.Encode(core.NewGobTxEncoder(buf)); err != nil {

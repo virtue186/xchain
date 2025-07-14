@@ -1,6 +1,9 @@
 package core
 
-import "fmt"
+import (
+	"encoding/binary"
+	"fmt"
+)
 
 type Instruction byte
 
@@ -10,23 +13,28 @@ const (
 	InstrPushByte Instruction = 0x0c
 	InstrPack     Instruction = 0x0d
 	InstrSub      Instruction = 0x0e
+	InstrStore    Instruction = 0x0f
 )
 
 type VM struct {
-	data  []byte
-	pc    int    // 指向下一条要执行的字节的位置
-	stack *Stack // 栈
-	sp    int    // 栈的指针
+	data          []byte
+	pc            int    // 指向下一条要执行的字节的位置
+	stack         *Stack // 栈
+	contractState *State
 }
 
 type Stack struct {
 	data []any
-	sp   int
+	sp   int // 栈的指针，初始化应当为-1
 }
 
-func (s *Stack) Push(v any) {
+func (s *Stack) Push(v any) error {
+	if s.sp >= len(s.data)-1 {
+		return fmt.Errorf("stack overflow")
+	}
 	s.sp++
 	s.data[s.sp] = v
+	return nil
 }
 
 func (s *Stack) Pop() any {
@@ -53,23 +61,20 @@ func NewStack(size int) *Stack {
 	}
 }
 
-func NewVm(data []byte) *VM {
+func NewVm(data []byte, state *State) *VM {
 	return &VM{
-		data:  data,
-		stack: NewStack(1024),
-		pc:    0,
+		data:          data,
+		stack:         NewStack(1024),
+		pc:            0,
+		contractState: state,
 	}
 }
 
 func (vm *VM) Run() error {
-	for {
+	for vm.pc < len(vm.data) {
 		instr := vm.data[vm.pc]
-		err := vm.Exec(Instruction(instr))
-		if err != nil {
-			return err
-		}
-		if vm.pc > len(vm.data)-1 {
-			break
+		if err := vm.Exec(Instruction(instr)); err != nil {
+			return err // 如果 Exec 出错，立即返回
 		}
 	}
 	return nil
@@ -78,6 +83,25 @@ func (vm *VM) Run() error {
 
 func (vm *VM) Exec(instr Instruction) error {
 	switch instr {
+
+	case InstrStore:
+		// 假设栈顶是 value，次顶是 key
+		value := vm.stack.Pop()
+		fmt.Println(value)
+		key := vm.stack.Pop().([]byte)
+		fmt.Println(key)
+		var serializedValue []byte
+		switch v := value.(type) {
+		case int:
+			serializedValue = serializeInt64(int64(v))
+		default:
+			panic("TODO: unknown type")
+		}
+		if err := vm.contractState.Put(key, serializedValue); err != nil {
+			return err
+		}
+		vm.pc++
+
 	case InstrPushInt:
 		val := int(vm.data[vm.pc+1])
 		vm.stack.Push(val)
@@ -107,7 +131,21 @@ func (vm *VM) Exec(instr Instruction) error {
 		a := vm.stack.Pop().(int)
 		vm.stack.Push(a - b)
 		vm.pc++
+	default:
+		return fmt.Errorf("invalid instruction: 0x%x at pc=%d", instr, vm.pc)
 	}
 
 	return nil
+}
+
+func serializeInt64(value int64) []byte {
+	buf := make([]byte, 8)
+
+	binary.LittleEndian.PutUint64(buf, uint64(value))
+
+	return buf
+}
+
+func deserializeInt64(b []byte) int64 {
+	return int64(binary.LittleEndian.Uint64(b))
 }

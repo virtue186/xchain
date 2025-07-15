@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-var defaultBlockTime = time.Second * 5
+var defaultBlockTime = time.Second * 15
 
 type ServerOpts struct {
 	ID           string
@@ -112,7 +112,8 @@ func (s *Server) ProcessBlock(block *core.Block) error {
 	if err != nil {
 		return err
 	}
-	go s.broadBlock(block)
+	//go s.broadBlock(block)
+	s.memPool.Flush(block.Transactions)
 	return nil
 }
 
@@ -123,7 +124,7 @@ free:
 		select {
 		case rpc := <-s.rpcCh:
 			// 使用注入的解码器进行解码
-			msg, err := s.decodeMessage(rpc)
+			msg, err := s.decodeMessage(rpc.Message)
 			if err != nil {
 				s.Logger.Log("err", err)
 				continue // 如果解码失败，继续处理下一条消息
@@ -140,29 +141,24 @@ free:
 	s.Logger.Log("server is shutting down")
 }
 
-func (s *Server) decodeMessage(rpc RPC) (*DecodedMessage, error) {
-	msg := &Message{}
-	// 解码外层的 Message 对象
-	if err := s.Decoder.Decode(rpc.Payload, msg); err != nil {
-		return nil, fmt.Errorf("decode message error: %w", err)
-	}
+func (s *Server) decodeMessage(msg *Message) (*DecodedMessage, error) {
+	// 这里的 Decoder 应该是 Server 自己的，用于解码 Message.Data
+	// 为了简单起见，我们暂时直接创建
+	decoder := core.GOBDecoder[any]{}
 
-	// 根据消息头，解码内层的具体数据
 	switch msg.Header {
 	case MessageTypeTx:
 		tx := new(core.Transaction)
-		if err := s.Decoder.Decode(bytes.NewReader(msg.Data), tx); err != nil {
+		if err := decoder.Decode(bytes.NewReader(msg.Data), tx); err != nil {
 			return nil, fmt.Errorf("decode transaction error: %w", err)
 		}
-		return &DecodedMessage{From: rpc.From, Data: tx}, nil
-
+		return &DecodedMessage{Data: tx}, nil
 	case MessageTypeBlock:
 		b := new(core.Block)
-		if err := s.Decoder.Decode(bytes.NewReader(msg.Data), b); err != nil {
+		if err := decoder.Decode(bytes.NewReader(msg.Data), b); err != nil {
 			return nil, fmt.Errorf("decode block error: %w", err)
 		}
-		return &DecodedMessage{From: rpc.From, Data: b}, nil
-
+		return &DecodedMessage{Data: b}, nil
 	default:
 		return nil, fmt.Errorf("unknown message header: %v", msg.Header)
 	}
@@ -174,13 +170,12 @@ func (s *Server) validatorLoop() {
 	s.Logger.Log("msg", "Starting validator loop", "blockTime", s.BlockTime)
 
 	for {
+		<-ticker.C
 		fmt.Println("creating new block")
-
 		if err := s.CreateNewBlock(); err != nil {
 			s.Logger.Log("create block error", err)
 		}
 
-		<-ticker.C
 	}
 }
 
@@ -269,11 +264,20 @@ func (s *Server) broadBlock(block *core.Block) error {
 }
 
 func (s *Server) broadcastTx(tx *core.Transaction) error {
-	buf := &bytes.Buffer{}
-	// 直接调用注入的编码器
-	if err := s.Encoder.Encode(buf, tx); err != nil {
-		return err
+	// 1. 将 Transaction 对象编码成字节流
+	txBuf := &bytes.Buffer{}
+	if err := s.Encoder.Encode(txBuf, tx); err != nil {
+		return fmt.Errorf("failed to encode transaction for broadcast: %w", err)
 	}
-	msg := NewMessage(MessageTypeTx, buf.Bytes())
-	return s.broadcast(msg.Bytes())
+
+	// 2. 创建 Message，将编码后的交易字节流放入 Data
+	msg := NewMessage(MessageTypeTx, txBuf.Bytes())
+
+	// 3. 将完整的 Message 对象编码后广播出去
+	finalBuf := &bytes.Buffer{}
+	if err := s.Encoder.Encode(finalBuf, msg); err != nil {
+		return fmt.Errorf("failed to encode message for broadcast: %w", err)
+	}
+
+	return s.broadcast(finalBuf.Bytes())
 }

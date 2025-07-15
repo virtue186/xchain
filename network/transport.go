@@ -3,8 +3,9 @@ package network
 type NetAddr string
 
 type Transport interface {
+	Dial(string) error
 	Consume() <-chan RPC
-	Connect(Transport) error
+	Close() error
 	SendMessage(NetAddr, []byte) error
 	Broadcast([]byte) error
 	Addr() NetAddr

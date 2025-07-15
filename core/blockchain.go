@@ -33,7 +33,7 @@ func (bc *BlockChain) AddBlock(b *Block) error {
 	}
 	for _, tx := range b.Transactions {
 		bc.logger.Log("msg", "executing code", "len", len(tx.Data), "hash", tx.Hash(&TxHasher{}))
-		vm := NewVm(tx.Data, NewState())
+		vm := NewVm(tx.Data, bc.contractState)
 		err := vm.Run()
 		if err != nil {
 			return err

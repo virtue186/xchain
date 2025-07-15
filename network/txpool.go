@@ -122,3 +122,16 @@ func (t *TxSortedMap) Clear() {
 	t.lookup = make(map[types.Hash]*core.Transaction)
 	t.txx.Clear()
 }
+
+func (p *TxPool) Flush(txx []*core.Transaction) {
+	for _, tx := range txx {
+		hash := tx.Hash(core.TxHasher{})
+
+		if p.pending.Contains(hash) {
+			p.pending.Remove(hash)
+		}
+		if p.all.Contains(hash) {
+			p.all.Remove(hash)
+		}
+	}
+}

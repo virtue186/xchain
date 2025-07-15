@@ -32,9 +32,21 @@ func (m *Message) Bytes() []byte {
 	return buf.Bytes()
 }
 
+type Peer interface {
+	Close() error
+}
+
+// HandshakeFunc 负责在节点间建立连接后执行握手协议。
+// 它可以用来交换版本信息、验证身份等。
+type HandshakeFunc func(Peer) error
+
+// NOPHandshakeFunc 是一个空操作的握手函数，用于测试或简单的实现。
+// 它总是返回成功，不做任何事情。
+func NOPHandshakeFunc(Peer) error { return nil }
+
 type RPC struct {
 	From    NetAddr
-	Payload io.Reader
+	Message *Message
 }
 
 type DecodedMessage struct {

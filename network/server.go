@@ -13,13 +13,15 @@ import (
 var defaultBlockTime = time.Second * 5
 
 type ServerOpts struct {
-	ID            string
-	Logger        log.Logger
-	RPCDecodeFunc RPCDecodeFunc
-	RPCProcessor  RPCProcessor
-	Transports    []Transport
-	PrivateKey    *crypto.PrivateKey
-	BlockTime     time.Duration
+	ID           string
+	Logger       log.Logger
+	RPCProcessor RPCProcessor
+	Transports   []Transport
+	PrivateKey   *crypto.PrivateKey
+	BlockTime    time.Duration
+	// 新增：统一的编码器和解码器
+	Encoder core.Encoder[any]
+	Decoder core.Decoder[any]
 }
 
 type Server struct {
@@ -36,8 +38,11 @@ func NewServer(opts ServerOpts) (*Server, error) {
 	if opts.BlockTime == time.Duration(0) {
 		opts.BlockTime = defaultBlockTime
 	}
-	if opts.RPCDecodeFunc == nil {
-		opts.RPCDecodeFunc = DefaultRPCDecodeFunc
+	if opts.Encoder == nil {
+		opts.Encoder = core.GOBEncoder[any]{}
+	}
+	if opts.Decoder == nil {
+		opts.Decoder = core.GOBDecoder[any]{}
 	}
 	if opts.Logger == nil {
 		opts.Logger = log.NewLogfmtLogger(os.Stderr)
@@ -117,9 +122,11 @@ free:
 	for {
 		select {
 		case rpc := <-s.rpcCh:
-			msg, err := s.RPCDecodeFunc(rpc)
+			// 使用注入的解码器进行解码
+			msg, err := s.decodeMessage(rpc)
 			if err != nil {
 				s.Logger.Log("err", err)
+				continue // 如果解码失败，继续处理下一条消息
 			}
 			err = s.RPCProcessor.ProcessMessage(msg)
 			if err != nil {
@@ -131,6 +138,34 @@ free:
 		}
 	}
 	s.Logger.Log("server is shutting down")
+}
+
+func (s *Server) decodeMessage(rpc RPC) (*DecodedMessage, error) {
+	msg := &Message{}
+	// 解码外层的 Message 对象
+	if err := s.Decoder.Decode(rpc.Payload, msg); err != nil {
+		return nil, fmt.Errorf("decode message error: %w", err)
+	}
+
+	// 根据消息头，解码内层的具体数据
+	switch msg.Header {
+	case MessageTypeTx:
+		tx := new(core.Transaction)
+		if err := s.Decoder.Decode(bytes.NewReader(msg.Data), tx); err != nil {
+			return nil, fmt.Errorf("decode transaction error: %w", err)
+		}
+		return &DecodedMessage{From: rpc.From, Data: tx}, nil
+
+	case MessageTypeBlock:
+		b := new(core.Block)
+		if err := s.Decoder.Decode(bytes.NewReader(msg.Data), b); err != nil {
+			return nil, fmt.Errorf("decode block error: %w", err)
+		}
+		return &DecodedMessage{From: rpc.From, Data: b}, nil
+
+	default:
+		return nil, fmt.Errorf("unknown message header: %v", msg.Header)
+	}
 }
 
 func (s *Server) validatorLoop() {
@@ -223,8 +258,8 @@ func (s *Server) broadcast(payload []byte) error {
 
 func (s *Server) broadBlock(block *core.Block) error {
 	buf := &bytes.Buffer{}
-	err := core.NewGobBlockEncoder(buf).Encode(block)
-	if err != nil {
+	// 直接调用注入的编码器
+	if err := s.Encoder.Encode(buf, block); err != nil {
 		return err
 	}
 
@@ -235,7 +270,8 @@ func (s *Server) broadBlock(block *core.Block) error {
 
 func (s *Server) broadcastTx(tx *core.Transaction) error {
 	buf := &bytes.Buffer{}
-	if err := tx.Encode(core.NewGobTxEncoder(buf)); err != nil {
+	// 直接调用注入的编码器
+	if err := s.Encoder.Encode(buf, tx); err != nil {
 		return err
 	}
 	msg := NewMessage(MessageTypeTx, buf.Bytes())

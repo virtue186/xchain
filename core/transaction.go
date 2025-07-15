@@ -28,14 +28,6 @@ func (tx *Transaction) Hash(hasher Hasher[*Transaction]) types.Hash {
 	return tx.hash
 }
 
-func (tx *Transaction) Encode(enc Encoder[*Transaction]) error {
-	return enc.Encode(tx)
-}
-
-func (tx *Transaction) Decode(dec Decoder[*Transaction]) error {
-	return dec.Decode(tx)
-}
-
 func (tx *Transaction) Sign(privateKey crypto.PrivateKey) error {
 	sign, err := privateKey.Sign(tx.Data)
 	if err != nil {

@@ -46,14 +46,6 @@ func (b *Block) Hash(hasher Hasher[*Header]) types.Hash {
 	return b.hash
 }
 
-func (b *Block) Encode(enc Encoder[*Block]) error {
-	return enc.Encode(b)
-}
-
-func (b *Block) Decode(enc Decoder[*Block]) error {
-	return enc.Decode(b)
-}
-
 func NewBlock(header *Header, transactions []*Transaction) (*Block, error) {
 	return &Block{
 		Header:       header,
@@ -113,8 +105,9 @@ func NewBlockFromPreHeader(h *Header, txx []*Transaction) (*Block, error) {
 func CalculateDataHash(txx []*Transaction) (hash types.Hash, err error) {
 	buf := &bytes.Buffer{}
 
+	encoder := GOBEncoder[any]{}
 	for _, tx := range txx {
-		if err = tx.Encode(NewGobTxEncoder(buf)); err != nil {
+		if err = encoder.Encode(buf, tx); err != nil {
 			return
 		}
 	}

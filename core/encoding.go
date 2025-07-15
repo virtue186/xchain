@@ -5,71 +5,26 @@ import (
 	"io"
 )
 
-//
-// For now we GOB encoding is used for fast bootstrapping of the project
-// in a later phase I'm considering using Protobuffers as default encoding / decoding.
-//
-
+// Encoder 定义了统一的、无状态的编码器接口
 type Encoder[T any] interface {
-	Encode(T) error
+	Encode(w io.Writer, v T) error
 }
 
+// Decoder 定义了统一的、无状态的解码器接口
 type Decoder[T any] interface {
-	Decode(T) error
+	Decode(r io.Reader, v T) error
 }
 
-type GobTxEncoder struct {
-	w io.Writer
+// GOBEncoder 是一个具体的 gob 编码器实现
+type GOBEncoder[T any] struct{}
+
+func (e GOBEncoder[T]) Encode(w io.Writer, v T) error {
+	return gob.NewEncoder(w).Encode(v)
 }
 
-func NewGobTxEncoder(w io.Writer) *GobTxEncoder {
-	return &GobTxEncoder{
-		w: w,
-	}
-}
+// GOBDecoder 是一个具体的 gob 解码器实现
+type GOBDecoder[T any] struct{}
 
-func (e *GobTxEncoder) Encode(tx *Transaction) error {
-	return gob.NewEncoder(e.w).Encode(tx)
-}
-
-type GobTxDecoder struct {
-	r io.Reader
-}
-
-func NewGobTxDecoder(r io.Reader) *GobTxDecoder {
-	return &GobTxDecoder{
-		r: r,
-	}
-}
-
-func (e *GobTxDecoder) Decode(tx *Transaction) error {
-	return gob.NewDecoder(e.r).Decode(tx)
-}
-
-type GobBlockEncoder struct {
-	w io.Writer
-}
-
-func NewGobBlockEncoder(w io.Writer) *GobBlockEncoder {
-	return &GobBlockEncoder{
-		w: w,
-	}
-}
-
-func (enc *GobBlockEncoder) Encode(b *Block) error {
-	return gob.NewEncoder(enc.w).Encode(b)
-}
-
-type GobBlockDecoder struct {
-	r io.Reader
-}
-
-func NewGobBlockDecoder(r io.Reader) *GobBlockDecoder {
-	return &GobBlockDecoder{
-		r: r,
-	}
-}
-
-func (dec *GobBlockDecoder) Decode(b *Block) error {
-	return gob.NewDecoder(dec.r).Decode(b)
+func (d GOBDecoder[T]) Decode(r io.Reader, v T) error {
+	return gob.NewDecoder(r).Decode(v)
 }

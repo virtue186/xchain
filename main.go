@@ -91,7 +91,9 @@ func sendTransaction(tr network.Transport, addr network.NetAddr) error {
 	tx := core.NewTransaction(code)
 	tx.Sign(privateKey)
 	buf := &bytes.Buffer{}
-	if err := tx.Encode(core.NewGobTxEncoder(buf)); err != nil {
+	encoder := core.GOBEncoder[any]{}
+
+	if err := encoder.Encode(buf, tx); err != nil {
 		return err
 	}
 

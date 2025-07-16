@@ -14,6 +14,11 @@ type TCPPeer struct {
 	outbound bool     // true 表示是我们主动发起的连接；false 表示是对方连接进来的
 }
 
+func (p *TCPPeer) Send(payload []byte) error {
+	_, err := p.conn.Write(payload)
+	return err
+}
+
 func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	return &TCPPeer{
 		conn:     conn,

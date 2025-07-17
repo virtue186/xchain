@@ -1,8 +1,7 @@
 package core
 
 import (
-	"bytes"
-	"encoding/gob"
+	"encoding/json"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/virtue186/xchain/types"
 	"strconv"
@@ -33,8 +32,8 @@ func NewLeveldbStorage(path string) (*LeveldbStorage, error) {
 }
 
 func (s *LeveldbStorage) PutBlock(block *Block) error {
-	buf := new(bytes.Buffer)
-	err := gob.NewEncoder(buf).Encode(block)
+	// 将 gob.NewEncoder(buf).Encode(block) 替换为 json.Marshal(block)
+	data, err := json.Marshal(block)
 	if err != nil {
 		return err
 	}
@@ -42,12 +41,13 @@ func (s *LeveldbStorage) PutBlock(block *Block) error {
 	batch := new(leveldb.Batch)
 
 	batch.Put(blockHeightKey(block.Height), blockHash.ToSlice())
-	batch.Put(blockKey(blockHash), buf.Bytes())
+	batch.Put(blockKey(blockHash), data)
 	return s.db.Write(batch, nil)
 
 }
 
 // GetBlockByHash 根据区块哈希从数据库中获取区块
+// 此处无需修改，因为它依赖的 DecodeBlock 已经在别处被修改为使用json
 func (s *LeveldbStorage) GetBlockByHash(hash types.Hash) (*Block, error) {
 	data, err := s.db.Get(blockKey(hash), nil)
 	if err != nil {

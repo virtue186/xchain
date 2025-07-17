@@ -37,7 +37,7 @@ func NewNode(opts NodeOpts) (*Node, error) {
 	// 1. 初始化编码器，提供默认值
 	encoder := opts.Encoder
 	if encoder == nil {
-		encoder = core.GOBEncoder[any]{}
+		encoder = core.JSONEncoder[any]{}
 	}
 
 	// 2. 初始化 ServerOpts，但先不创建Server，因为Server依赖RPCProcessor

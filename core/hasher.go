@@ -1,9 +1,8 @@
 package core
 
 import (
-	"bytes"
 	"crypto/sha256"
-	"encoding/gob"
+	"encoding/json"
 	"github.com/virtue186/xchain/types"
 )
 
@@ -25,26 +24,10 @@ type TxHasher struct {
 
 // Hash 计算交易的哈希值
 func (TxHasher) Hash(tx *Transaction) types.Hash {
-	dataToHash := &struct {
-		Data  []byte
-		To    types.Address
-		Value uint64
-		Nonce uint64
-	}{
-		To:    tx.To,
-		Value: tx.Value,
-		Nonce: tx.Nonce,
-	}
 
-	if len(tx.Data) == 0 {
-		dataToHash.Data = []byte{}
-	} else {
-		dataToHash.Data = tx.Data
-	}
-
-	buf := new(bytes.Buffer)
-	if err := gob.NewEncoder(buf).Encode(dataToHash); err != nil {
+	b, err := json.Marshal(tx)
+	if err != nil {
 		panic(err)
 	}
-	return sha256.Sum256(buf.Bytes())
+	return sha256.Sum256(b)
 }

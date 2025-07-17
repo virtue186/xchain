@@ -1,9 +1,8 @@
 package core
 
 import (
-	"bytes"
 	"crypto/sha256"
-	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"github.com/virtue186/xchain/crypto"
 	"github.com/virtue186/xchain/types"
@@ -30,13 +29,12 @@ type Block struct {
 }
 
 func (h *Header) Bytes() []byte {
-	buf := &bytes.Buffer{}
-	err := gob.NewEncoder(buf).Encode(h)
+	b, err := json.Marshal(h)
 	if err != nil {
-		return nil
+		// 在关键操作中，如果序列化失败，panic是可接受的
+		panic(err)
 	}
-	return buf.Bytes()
-
+	return b
 }
 
 func (b *Block) Hash(hasher Hasher[*Header]) types.Hash {
@@ -104,40 +102,18 @@ func NewBlockFromPreHeader(h *Header, txx []*Transaction) (*Block, error) {
 }
 
 func CalculateDataHash(txx []*Transaction) (hash types.Hash, err error) {
-	buf := &bytes.Buffer{}
-
-	// 对每一笔交易，我们只编码其核心数据，与签名和交易哈希的逻辑完全保持一致
-	for _, tx := range txx {
-		// 使用与签名和哈希完全相同的匿名结构体
-		dataToEncode := &struct {
-			Data  []byte
-			To    types.Address
-			Value uint64
-			Nonce uint64
-		}{
-			To:    tx.To,
-			Value: tx.Value,
-			Nonce: tx.Nonce,
-		}
-		if len(tx.Data) == 0 {
-			dataToEncode.Data = []byte{}
-		} else {
-			dataToEncode.Data = tx.Data
-		}
-
-		// 使用 gob 编码这个纯净的数据结构
-		if err = gob.NewEncoder(buf).Encode(dataToEncode); err != nil {
-			return
-		}
+	// 将整个交易列表进行json编码
+	b, err := json.Marshal(txx)
+	if err != nil {
+		return types.Hash{}, err
 	}
-
-	hash = sha256.Sum256(buf.Bytes())
+	hash = sha256.Sum256(b)
 	return
 }
 
 func DecodeBlock(b []byte) (*Block, error) {
 	block := new(Block)
-	if err := gob.NewDecoder(bytes.NewReader(b)).Decode(block); err != nil {
+	if err := json.Unmarshal(b, block); err != nil {
 		return nil, err
 	}
 	return block, nil

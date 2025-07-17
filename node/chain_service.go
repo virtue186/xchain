@@ -146,7 +146,7 @@ func (s *ChainService) handleGetBlocksMessage(from network.NetAddr, data *networ
 	blocksData := make([][]byte, len(blocks))
 	for i, block := range blocks {
 		buf := new(bytes.Buffer)
-		if err := block.Encode(buf, core.GOBEncoder[*core.Block]{}); err != nil { // 假设 Block 有 Encode 方法
+		if err := block.Encode(buf, core.JSONEncoder[*core.Block]{}); err != nil { // 假设 Block 有 Encode 方法
 			return err
 		}
 		blocksData[i] = buf.Bytes()

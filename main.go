@@ -124,7 +124,7 @@ func makeNode(listenAddr, apiListenAddr string, pk *crypto.PrivateKey, genesisDa
 	opts := network.TCPTransportOpts{
 		ListenAddr:    listenAddr,
 		HandshakeFunc: network.NOPHandshakeFunc,
-		Decoder:       core.GOBDecoder[*network.Message]{},
+		Decoder:       core.JSONDecoder[*network.Message]{},
 	}
 	tr := network.NewTCPTransport(opts)
 

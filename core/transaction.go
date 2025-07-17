@@ -1,8 +1,7 @@
 package core
 
 import (
-	"bytes"
-	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"github.com/virtue186/xchain/crypto"
 	"github.com/virtue186/xchain/types"
@@ -29,6 +28,7 @@ type TxData struct {
 }
 
 func NewTransaction(data []byte) *Transaction {
+
 	return &Transaction{
 		Data: data,
 	}
@@ -84,32 +84,13 @@ func (tx *Transaction) GetFirstSeen() int64 {
 
 // encodeForSignature 是一个内部辅助方法，用于将需要签名的数据编码
 func (tx *Transaction) encodeForSignature() ([]byte, error) {
-	buf := new(bytes.Buffer)
+	// 创建一个不包含签名和公钥的临时副本用于签名
+	// 这是为了防止签名数据包含上一次的签名结果
+	txCopy := *tx
+	txCopy.Signature = nil
+	txCopy.From = nil
 
-	// 为了确保签名的绝对一致性，我们创建一个临时的、匿名的结构体
-	// 它只包含需要被签名的核心字段。
-	dataToSign := &struct {
-		Data  []byte
-		To    types.Address
-		Value uint64
-		Nonce uint64
-	}{
-		To:    tx.To,
-		Value: tx.Value,
-		Nonce: tx.Nonce,
-	}
-
-	if len(tx.Data) == 0 {
-		dataToSign.Data = []byte{}
-	} else {
-		dataToSign.Data = tx.Data
-	}
-
-	// 对这个规范化后的结构进行编码
-	if err := gob.NewEncoder(buf).Encode(dataToSign); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return json.Marshal(&txCopy)
 }
 
 // Encode 将整个交易编码到写入器

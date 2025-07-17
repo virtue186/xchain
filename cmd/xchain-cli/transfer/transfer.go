@@ -67,12 +67,15 @@ and submits it to the blockchain network via RPC.`,
 			tx.Value = amount
 			tx.Nonce = nonce
 
+			if tx.Data == nil {
+				tx.Data = []byte{}
+			}
 			if err := tx.Sign(fromKey); err != nil {
 				return fmt.Errorf("failed to sign transaction: %w", err)
 			}
 
 			buf := new(bytes.Buffer)
-			if err := tx.Encode(buf, core.GOBEncoder[*core.Transaction]{}); err != nil {
+			if err := tx.Encode(buf, core.JSONEncoder[*core.Transaction]{}); err != nil {
 				return fmt.Errorf("failed to encode transaction: %w", err)
 			}
 			rawTxHex := hex.EncodeToString(buf.Bytes())

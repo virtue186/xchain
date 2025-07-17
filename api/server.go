@@ -173,11 +173,10 @@ func (s *APIServer) handleSendRawTransaction(w http.ResponseWriter, req JSONRPCR
 
 	// 2. 将字节反序列化为 Transaction 对象
 	tx := new(core.Transaction)
-	if err := tx.Decode(bytes.NewReader(txBytes), core.GOBDecoder[*core.Transaction]{}); err != nil {
+	if err := tx.Decode(bytes.NewReader(txBytes), core.JSONDecoder[*core.Transaction]{}); err != nil {
 		writeError(w, -32602, fmt.Sprintf("Invalid tx_data: failed to decode transaction: %s", err), req.ID)
 		return
 	}
-
 	// 3. 【核心逻辑】将交易添加到交易池
 	s.txPool.Add(tx)
 

@@ -29,10 +29,10 @@ func NewServer(opts ServerOpts) *Server {
 		opts.Logger = log.With(opts.Logger, "ID", opts.ID)
 	}
 	if opts.Encoder == nil {
-		opts.Encoder = core.GOBEncoder[any]{}
+		opts.Encoder = core.JSONEncoder[any]{}
 	}
 	if opts.Decoder == nil {
-		opts.Decoder = core.GOBDecoder[any]{}
+		opts.Decoder = core.JSONDecoder[any]{}
 	}
 
 	s := &Server{

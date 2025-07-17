@@ -62,7 +62,7 @@ node=127.0.0.1:3000 module=api msg="starting API server" listenAddr=127.0.0.1:80
 1. 创建账户
 
    ```cmd
-   go run ./cmd/xchain-cli account new
+   go run ./cmd/xchain-cli new
    ```
 
 2. 查询余额（d55eff4e8c6e1e15740ccf223828cf217d694118是创世块中预分配了资金的账户）

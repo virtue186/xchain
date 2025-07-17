@@ -2,13 +2,16 @@ package network
 
 import (
 	"fmt"
-	"io"
 )
 
 // MessageType 定义了消息的类型
 const (
-	MessageTypeTx    MessageType = 0x1
-	MessageTypeBlock MessageType = 0x2
+	MessageTypeTx        MessageType = 0x1
+	MessageTypeBlock     MessageType = 0x2
+	MessageTypeGetStatus MessageType = 0x3 // 新增: 请求获取节点状态
+	MessageTypeStatus    MessageType = 0x4 // 新增: 响应节点状态
+	MessageTypeGetBlocks MessageType = 0x5 // 新增: 请求获取区块
+	MessageTypeBlocks    MessageType = 0x6 // 新增: 响应区块请求
 )
 
 type MessageType byte
@@ -24,12 +27,6 @@ func NewMessage(header MessageType, data []byte) *Message {
 		Header: header,
 		Data:   data,
 	}
-}
-
-// Peer 是对一个网络对等节点的通用接口
-type Peer interface {
-	io.Closer          // Peer应该可以被关闭
-	Send([]byte) error // Peer应该可以发送数据
 }
 
 // HandshakeFunc 负责在节点间建立连接后执行握手协议

@@ -12,6 +12,7 @@ func TestGeneratePrivateKey(t *testing.T) {
 	publicKey := privateKey.PublicKey()
 	address := publicKey.Address()
 	fmt.Println(address)
+	fmt.Println(privateKey)
 	msg := []byte("hello world")
 	errmsg := []byte("hello world!")
 	sign, err := privateKey.Sign(msg)

@@ -1,16 +1,16 @@
 package core
 
+import "github.com/virtue186/xchain/types"
+
 type Storage interface {
-	Put(*Block) error
-}
+	Close() error
+	// 通用键值对存储
+	Put([]byte, []byte) error
+	Get([]byte) ([]byte, error)
+	Delete([]byte) error
 
-type MemoryStorage struct {
-}
-
-func NewMemoryStorage() *MemoryStorage {
-	return &MemoryStorage{}
-}
-
-func (s MemoryStorage) Put(block *Block) error {
-	return nil
+	// 专用于区块的方法
+	PutBlock(*Block) error
+	GetBlockByHash(types.Hash) (*Block, error)
+	GetBlockHashByHeight(uint32) (types.Hash, error)
 }

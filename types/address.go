@@ -1,6 +1,9 @@
 package types
 
-import "encoding/hex"
+import (
+	"encoding/hex"
+	"fmt"
+)
 
 type Address [20]uint8
 
@@ -26,4 +29,25 @@ func AddressFromBytes(b []byte) Address {
 	}
 
 	return value
+}
+
+func AddressFromHex(s string) (Address, error) {
+	// 1. 如果有 "0x" 前缀，则去掉
+	if len(s) > 2 && s[:2] == "0x" {
+		s = s[2:]
+	}
+
+	// 2. 将十六进制字符串解码为字节
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		return Address{}, err
+	}
+
+	// 3. 验证长度是否正确
+	if len(b) != 20 {
+		return Address{}, fmt.Errorf("invalid address length, expected 20 bytes, got %d", len(b))
+	}
+
+	// 4. 使用已有的 AddressFromBytes 进行转换
+	return AddressFromBytes(b), nil
 }

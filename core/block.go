@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/virtue186/xchain/crypto"
 	"github.com/virtue186/xchain/types"
+	"io"
 	"time"
 )
 
@@ -105,14 +106,43 @@ func NewBlockFromPreHeader(h *Header, txx []*Transaction) (*Block, error) {
 func CalculateDataHash(txx []*Transaction) (hash types.Hash, err error) {
 	buf := &bytes.Buffer{}
 
-	encoder := GOBEncoder[any]{}
+	// 对每一笔交易，我们只编码其核心数据，与签名和交易哈希的逻辑完全保持一致
 	for _, tx := range txx {
-		if err = encoder.Encode(buf, tx); err != nil {
+		// 使用与签名和哈希完全相同的匿名结构体
+		dataToEncode := &struct {
+			Data  []byte
+			To    types.Address
+			Value uint64
+			Nonce uint64
+		}{
+			To:    tx.To,
+			Value: tx.Value,
+			Nonce: tx.Nonce,
+		}
+		if len(tx.Data) == 0 {
+			dataToEncode.Data = []byte{}
+		} else {
+			dataToEncode.Data = tx.Data
+		}
+
+		// 使用 gob 编码这个纯净的数据结构
+		if err = gob.NewEncoder(buf).Encode(dataToEncode); err != nil {
 			return
 		}
 	}
 
 	hash = sha256.Sum256(buf.Bytes())
-
 	return
+}
+
+func DecodeBlock(b []byte) (*Block, error) {
+	block := new(Block)
+	if err := gob.NewDecoder(bytes.NewReader(b)).Decode(block); err != nil {
+		return nil, err
+	}
+	return block, nil
+}
+
+func (b *Block) Encode(w io.Writer, encoder Encoder[*Block]) error {
+	return encoder.Encode(w, b)
 }

@@ -7,10 +7,8 @@ import (
 )
 
 type TxPool struct {
-	all     *TxSortedMap
-	pending *TxSortedMap
-	// The maxLength of the total pool of transactions.
-	// When the pool is full we will prune the oldest transaction.
+	all       *TxSortedMap
+	pending   *TxSortedMap
 	maxLength int
 }
 

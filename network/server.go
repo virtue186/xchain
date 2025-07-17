@@ -110,9 +110,51 @@ func (s *Server) decodeMessageData(msg *Message, from NetAddr) (*DecodedMessage,
 		}
 		decodedMsg.Data = b
 
+	case MessageTypeGetStatus:
+		getStatusMsg := new(GetStatusMessage)
+		if err := s.Decoder.Decode(bytes.NewReader(msg.Data), getStatusMsg); err != nil {
+			return nil, fmt.Errorf("failed to decode getstatus message: %w", err)
+		}
+		decodedMsg.Data = getStatusMsg
+
+	case MessageTypeStatus:
+		statusMsg := new(StatusMessage)
+		if err := s.Decoder.Decode(bytes.NewReader(msg.Data), statusMsg); err != nil {
+			return nil, fmt.Errorf("failed to decode status message: %w", err)
+		}
+		decodedMsg.Data = statusMsg
+
+	case MessageTypeGetBlocks:
+		getBlocksMsg := new(GetBlocksMessage)
+		if err := s.Decoder.Decode(bytes.NewReader(msg.Data), getBlocksMsg); err != nil {
+			return nil, fmt.Errorf("failed to decode getblocks message: %w", err)
+		}
+		decodedMsg.Data = getBlocksMsg
+
+	case MessageTypeBlocks:
+		blocksMsg := new(BlocksMessage)
+		if err := s.Decoder.Decode(bytes.NewReader(msg.Data), blocksMsg); err != nil {
+			return nil, fmt.Errorf("failed to decode blocks message: %w", err)
+		}
+		decodedMsg.Data = blocksMsg
+
 	default:
 		return nil, fmt.Errorf("unknown message header: %v", msg.Header)
 	}
 
 	return decodedMsg, nil
+}
+
+func (s *Server) SendMessage(to NetAddr, payload []byte) error {
+	for _, tr := range s.Transports {
+		// 这里假设 Transport 知道如何处理 NetAddr。
+		// TCPTransport 会在其 peer map 中查找。
+		// 如果一个 Server 连接了多个 transport, 需要 Transport 层能区分 peer。
+		// 当前设计是每个 Transport 维护自己的 peer 列表，所以我们尝试通过每个 transport 发送。
+		// 如果找到对应的 peer，SendMessage 会成功。
+		if err := tr.SendMessage(to, payload); err == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("failed to send message to %s: peer not found in any transport", to)
 }

@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"github.com/virtue186/xchain/types"
 	"io"
 	"math/big"
@@ -16,7 +17,8 @@ type PrivateKey struct {
 }
 
 func (k PrivateKey) Sign(data []byte) (*Signature, error) {
-	r, s, err := ecdsa.Sign(rand.Reader, k.key, data)
+	hash := sha256.Sum256(data)
+	r, s, err := ecdsa.Sign(rand.Reader, k.key, hash[:])
 	if err != nil {
 		return nil, err
 	}
@@ -75,6 +77,36 @@ func (sig Signature) Verify(pubKey PublicKey, data []byte) bool {
 		X:     x,
 		Y:     y,
 	}
+	// 1. 同样对原始数据进行哈希计算，以确保与签名时的数据一致
+	hash := sha256.Sum256(data)
 
-	return ecdsa.Verify(key, data, sig.R, sig.S)
+	// 2. 用同样的哈希结果进行验证
+	return ecdsa.Verify(key, hash[:], sig.R, sig.S)
+}
+
+func NewPrivateKeyFromHex(hexKey string) (PrivateKey, error) {
+	// 1. 将十六进制字符串解码为字节
+	b, err := hex.DecodeString(hexKey)
+	if err != nil {
+		return PrivateKey{}, err
+	}
+
+	// 2. 验证私钥长度是否符合P-256曲线的要求 (通常是32字节)
+	if len(b) != 32 {
+		return PrivateKey{}, fmt.Errorf("invalid private key length, expected 32 bytes, got %d", len(b))
+	}
+
+	// 3. 将字节转换为 ecdsa.PrivateKey
+	priv := new(ecdsa.PrivateKey)
+	priv.D = new(big.Int).SetBytes(b)
+	priv.PublicKey.Curve = elliptic.P256()
+	priv.PublicKey.X, priv.PublicKey.Y = priv.PublicKey.Curve.ScalarBaseMult(b)
+
+	return PrivateKey{
+		key: priv,
+	}, nil
+}
+
+func (k PrivateKey) String() string {
+	return hex.EncodeToString(k.key.D.Bytes())
 }

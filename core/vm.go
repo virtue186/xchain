@@ -84,23 +84,23 @@ func (vm *VM) Run() error {
 func (vm *VM) Exec(instr Instruction) error {
 	switch instr {
 
-	case InstrStore:
-		// 假设栈顶是 value，次顶是 key
-		value := vm.stack.Pop()
-		fmt.Println(value)
-		key := vm.stack.Pop().([]byte)
-		fmt.Println(key)
-		var serializedValue []byte
-		switch v := value.(type) {
-		case int:
-			serializedValue = serializeInt64(int64(v))
-		default:
-			panic("TODO: unknown type")
-		}
-		if err := vm.contractState.Put(key, serializedValue); err != nil {
-			return err
-		}
-		vm.pc++
+	//case InstrStore:
+	//	// 假设栈顶是 value，次顶是 key
+	//	value := vm.stack.Pop()
+	//	fmt.Println(value)
+	//	key := vm.stack.Pop().([]byte)
+	//	fmt.Println(key)
+	//	var serializedValue []byte
+	//	switch v := value.(type) {
+	//	case int:
+	//		serializedValue = serializeInt64(int64(v))
+	//	default:
+	//		panic("TODO: unknown type")
+	//	}
+	//	if err := vm.contractState.Put(key, serializedValue); err != nil {
+	//		return err
+	//	}
+	//	vm.pc++
 
 	case InstrPushInt:
 		val := int(vm.data[vm.pc+1])
